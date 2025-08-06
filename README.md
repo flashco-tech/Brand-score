@@ -36,7 +36,7 @@ The Brand Trust Analysis System collects data from multiple online sources to ev
 ### Install Dependencies
 ```bash
 git clone https://github.com/yourusername/brand-trust-analysis.git
-cd brand-trust-analysis
+cd brand-score
 pip install -r requirements.txt
 ```
 
