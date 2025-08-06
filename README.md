@@ -40,26 +40,6 @@ cd brand-score
 pip install -r requirements.txt
 ```
 
-### Required Python Packages
-Create a `requirements.txt` file with:
-```txt
-langgraph
-requests
-serpapi
-praw
-twscrape
-firecrawl-py
-google-generativeai
-python-dotenv
-tqdm
-fuzzywuzzy
-asyncio
-beautifulsoup4
-ssl
-socket
-pathlib
-concurrent.futures
-```
 
 ## ⚙️ Configuration
 
@@ -78,7 +58,7 @@ REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=brand_reviews_scraper/1.0
 
-# Twitter/X Accounts - Optional
+# Twitter/X Accounts 
 username1=your_twitter_username1
 password1=your_twitter_password1
 email1=your_twitter_email1
@@ -89,41 +69,15 @@ password2=your_twitter_password2
 email2=your_twitter_email2
 email_pass2=your_email_password2
 
-# Firecrawl (Website Analysis) - Optional but recommended
+# Firecrawl (Website Analysis) 
 FIRECRAWL_API_KEY=your_firecrawl_api_key
 ```
-
-### 🔑 API Key Setup Guide
-
-#### 1. 🔍 SerpAPI (Required)
-- Sign up at [serpapi.com](https://serpapi.com)
-- Get your API key from dashboard
-- 💡 Free tier includes 100 searches/month
-
-#### 2. 🤖 Google Gemini AI (Required)
-- Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
-- Create a new API key
-- 💡 Free tier available with generous limits
-
-#### 3. 💬 Reddit API (Optional)
-- Create an app at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps)
-- Select "script" type application
-- Note down client ID and secret
-
-#### 4. 🐦 Twitter/X Accounts (Optional)
-- Use existing Twitter accounts (2 recommended for better rate limits)
-- Accounts should be verified and have access to the platform
-
-#### 5. 🔥 Firecrawl (Optional)
-- Sign up at [firecrawl.dev](https://firecrawl.dev)
-- Get API key for enhanced website scraping
-- 💡 Fallback to basic HTTP requests if not available
 
 ## 🚀 Usage
 
 ### Command Line Interface
 ```bash
-python brand_analyzer.py
+python langraph_1.py
 ```
 
 Follow the interactive prompts:
@@ -133,7 +87,7 @@ Follow the interactive prompts:
 
 ### Programmatic Usage
 ```python
-from brand_analyzer import BrandAnalyzer
+from langraph_1 import BrandAnalyzer
 
 # Initialize analyzer
 analyzer = BrandAnalyzer()
@@ -209,105 +163,8 @@ The system generates a detailed JSON report:
 - **🐦 Twitter/X**: Subject to platform rate limits and account restrictions
 - **🌐 Website Analysis**: Limited to publicly accessible pages
 
-### 🔒 Rate Limits
-| Service | Free Tier Limit |
-|---------|----------------|
-| 🔍 SerpAPI | 100 searches/month |
-| 🐦 Twitter | Account-dependent |
-| 💬 Reddit | 60 requests/minute |
-| 🤖 Gemini AI | Generous free limits |
 
-### 🎯 Analysis Scope
-- ✅ Focuses on online reputation and public information
-- ❌ Cannot access private customer service records
-- 🌍 Limited to English language content
-- ⏰ May not capture very recent events (real-time limitations)
 
-## 🔧 Troubleshooting
+Made with ❤️ by Akshay Kumar
 
-### 🚨 Common Issues
 
-#### API Key Errors
-```bash
-❌ SERPAPI_KEY not found in environment variables
-```
-**💡 Solution**: Ensure `.env` file is properly configured with valid API keys
-
-#### Network Timeouts
-```bash
-❌ Error fetching reviews: Connection timeout
-```
-**💡 Solution**: Check internet connection and API service status
-
-#### Rate Limit Exceeded
-```bash
-❌ API rate limit exceeded
-```
-**💡 Solution**: Wait for rate limit reset or upgrade API plan
-
-#### Empty Results
-```bash
-⚠️ No reviews collected
-```
-**💡 Solution**: Try different brand name variations or check if brand exists online
-
-### 🐛 Debug Mode
-Set environment variable for detailed logging:
-```bash
-export DEBUG=1
-python brand_analyzer.py
-```
-
-## 🤝 Contributing
-
-### 🛠️ Development Setup
-1. 🍴 Fork the repository
-2. 🐍 Create a virtual environment
-3. 📦 Install development dependencies
-4. 🧪 Run tests before submitting PRs
-
-### 🔌 Adding New Data Sources
-1. Create a new node function in the format `scrape_{source}_node`
-2. Add to parallel collection workflow
-3. Update trust scoring components if needed
-4. Add appropriate error handling
-
-### 📊 Extending Analysis Components
-1. Add new analyzer method to `BrandTrustScorer`
-2. Update component weights in `calculate_trust_score`
-3. Add corresponding prompts for AI analysis
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## ⚠️ Disclaimer
-
-This tool is for research and informational purposes only. Trust scores are based on publicly available data and should not be the sole factor in business decisions. Always conduct additional due diligence before making purchases or business partnerships.
-
-## 💬 Support
-
-For issues and questions:
-1. 🔍 Check the troubleshooting section
-2. 📖 Review API documentation for external services
-3. 🐛 Create an issue with detailed error logs and steps to reproduce
-
-## 📝 Changelog
-
-### Version 1.0.0
-- ✨ Initial release with multi-source data collection
-- 🤖 AI-powered trust scoring system
-- 📊 Comprehensive reporting capabilities
-- ⚡ Parallel processing for improved performance
-
----
-
-<div align="center">
-
-**🌟 Star this repository if you find it helpful!**
-
-Made with ❤️ and 🤖 AI
-
-</div>
