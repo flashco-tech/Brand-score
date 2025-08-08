@@ -37,7 +37,7 @@ class BrandAnalysisState(TypedDict):
     # Data collection results
     google_reviews: List[Dict[str, Any]]
     reddit_reviews: List[Dict[str, Any]]
-    twitter_data: Dict[str, Any]
+    # twitter_data: Dict[str, Any]
     website_trust_data: Dict[str, Any]
     
     # Analysis results
@@ -52,117 +52,84 @@ class BrandAnalysisState(TypedDict):
 # GOOGLE REVIEWS NODE
 # ========================
 
-def fetch_reviews(product_id: str, min_pages: int = 5, max_pages: int = 15) -> Dict[str, Any]:
+def fetch_reviews(product_id: str, min_pages: int = 1, max_pages: int = 1) -> Dict[str, Any]:
     """Fetch reviews for a specific product from Google with improved pagination."""
     all_reviews = []
     overall_ratings = None
     page_count = 0
-    reviews_per_page = 30  # Increased from 15
+    
 
     params = {
         "engine": "google_product",
         "product_id": product_id,
-        "google_domain": "google.co.in",
+        "google_domain": "google.com",
         "gl": "in",
         "hl": "en",
         "location": "India",
-        "reviews": str(reviews_per_page),
+        "reviews": "1",
         "api_key": os.getenv("SERPAPI_KEY"),
         "sort_by": "relevance"  # Try different sorting
     }
 
     print(f"  📊 Fetching reviews for product ID: {product_id}")
 
-    while page_count < max_pages:
-        try:
-            search = GoogleSearch(params)
-            results = search.get_dict()
-            page_count += 1
+    # Modified to fetch only the first page
+    try:
+        search = GoogleSearch(params)
+        results = search.get_dict()
+        page_count = 1
 
-            # Extract overall ratings on first page
-            if overall_ratings is None:
-                product_results = results.get("product_results", {})
-                reviews_results = results.get("reviews_results", {})
-                
-                overall_ratings = {
-                    "average_rating": product_results.get("rating"),
-                    "total_reviews": product_results.get("reviews"),
-                    "ratings_breakdown": reviews_results.get("ratings", []),
-                    "product_title": product_results.get("title", "")
-                }
-                
-                print(f"    📈 Product: {overall_ratings['product_title']}")
-                print(f"    ⭐ Rating: {overall_ratings['average_rating']}, Reviews: {overall_ratings['total_reviews']}")
+        # Extract overall ratings on first page
+        product_results = results.get("product_results", {})
+        reviews_results = results.get("reviews_results", {})
+        
+        overall_ratings = {
+            "average_rating": product_results.get("rating"),
+            "total_reviews": product_results.get("reviews"),
+            "ratings_breakdown": reviews_results.get("ratings", []),
+            "product_title": product_results.get("title", "")
+        }
+        
+        print(f"    📈 Product: {overall_ratings['product_title']}")
+        print(f"    ⭐ Rating: {overall_ratings['average_rating']}, Reviews: {overall_ratings['total_reviews']}")
 
-            # Extract reviews from current page
-            reviews = results.get("reviews_results", {}).get("reviews", [])
-            page_reviews_count = len(reviews)
-            
-            if page_reviews_count == 0:
-                print(f"    ⚠️  No reviews found on page {page_count}")
-                # Try different sort orders if no reviews
-                if page_count == 1:
-                    for sort_order in ["most_relevant", "newest", "oldest", "highest_rating", "lowest_rating"]:
-                        params["sort_by"] = sort_order
-                        search = GoogleSearch(params)
-                        results = search.get_dict()
-                        reviews = results.get("reviews_results", {}).get("reviews", [])
-                        if reviews:
-                            print(f"    ✅ Found {len(reviews)} reviews with sort: {sort_order}")
-                            break
-                    params.pop("sort_by", None)  # Remove sort_by for subsequent pages
-                
-                if not reviews:
+        # Extract reviews from first page
+        reviews = results.get("reviews_results", {}).get("reviews", [])
+        page_reviews_count = len(reviews)
+        
+        if page_reviews_count == 0:
+            print(f"    ⚠️  No reviews found on page 1")
+            # Try different sort orders if no reviews
+            for sort_order in ["most_relevant", "newest", "oldest", "highest_rating", "lowest_rating"]:
+                params["sort_by"] = sort_order
+                search = GoogleSearch(params)
+                results = search.get_dict()
+                reviews = results.get("reviews_results", {}).get("reviews", [])
+                if reviews:
+                    print(f"    ✅ Found {len(reviews)} reviews with sort: {sort_order}")
                     break
 
-            # Process reviews
-            for r in reviews:
-                review_data = {
-                    "date": r.get("date"),
-                    "rating": r.get("rating"),
-                    "source": r.get("source"),
-                    "content": r.get("content", ""),
-                    "images": r.get("images", []),
-                    "helpful_count": r.get("helpful_count"),
-                    "user": r.get("user", {})
-                }
-                # Only add reviews with content
-                if review_data["content"] and len(review_data["content"].strip()) > 10:
-                    all_reviews.append(review_data)
+        # Process reviews
+        for r in reviews:
+            review_data = {
+                "date": r.get("date"),
+                "rating": r.get("rating"),
+                "source": r.get("source"),
+                "content": r.get("content", ""),
+                "images": r.get("images", []),
+                "helpful_count": r.get("helpful_count"),
+                "user": r.get("user", {})
+            }
+            # Only add reviews with content
+            if review_data["content"] and len(review_data["content"].strip()) > 10:
+                all_reviews.append(review_data)
 
-            print(f"    📄 Page {page_count}: Found {page_reviews_count} reviews, Total: {len(all_reviews)}")
+        print(f"    📄 Page 1: Found {page_reviews_count} reviews, Total: {len(all_reviews)}")
+        
+    except Exception as e:
+        print(f"    ❌ Error fetching reviews for page 1: {e}")
 
-            # Check for next page
-            pagination = results.get("serpapi_pagination", {})
-            if not pagination.get("next"):
-                print(f"    🏁 No more pages available after page {page_count}")
-                break
-            
-            # Update pagination parameters
-            if "next_page_filter" in pagination:
-                params["filter"] = pagination["next_page_filter"]
-            elif "next" in pagination:
-                # Sometimes we need to parse the next URL for parameters
-                next_url = pagination["next"]
-                if "start=" in next_url:
-                    import re
-                    start_match = re.search(r'start=(\d+)', next_url)
-                    if start_match:
-                        params["start"] = start_match.group(1)
-            
-            # Rate limiting with randomization
-            time.sleep(random.uniform(2, 4))
-            
-        except Exception as e:
-            print(f"    ❌ Error fetching reviews for page {page_count}: {e}")
-            break
-
-        # Early termination conditions
-        if page_count >= min_pages and len(all_reviews) > 50:
-            print(f"    ✅ Sufficient reviews collected: {len(all_reviews)}")
-            break
-
-    print(f"  📊 Total reviews collected: {len(all_reviews)} from {page_count} pages")
+    print(f"  📊 Total reviews collected: {len(all_reviews)} from 1 page")
     return {
         "product_id": product_id,
         "overall_rating": overall_ratings,
@@ -174,44 +141,38 @@ def search_products(brand: str, max_products: int = 50) -> List[Dict[str, Any]]:
     """Search for products with multiple search strategies."""
     all_products = []
     
-    # Multiple search strategies
+    # Multiple search strategies - expanded for more coverage
     search_queries = [
         brand,
-        f"{brand} "
+        f"{brand}"
     ]
     
     for query in search_queries:
         print(f"  🔍 Searching: '{query}'")
         
-        # Try multiple pages for each query
-    # Get more results
+        # Try multiple pages for each query - increased num for more results
         params = {
-                "engine": "google_shopping",
-                "google_domain": "google.co.in",
-                "q": query,
-                "start":"1",
-                "num": "5", 
-                "hl": "en",
-                "gl": "in",
-                "location": "India",
-                "api_key": os.getenv("SERPAPI_KEY")
-            }
+            "engine": "google_shopping",
+            "google_domain": "google.com",
+            "q": query,
+            "start": "1",
+            "num": "3",  
+            "hl": "en",
+            "gl": "in",
+            "location": "India",
+            "api_key": os.getenv("SERPAPI_KEY")
+        }
 
-       
         search = GoogleSearch(params)
         results = search.get_dict()
         products = extract_products(results, brand)
         print(f"    📦 Found {len(products)} relevant products")
                 
         all_products.extend(products)
-                
-                
-                    
+        
         time.sleep(random.uniform(1, 2))
-                
         
-        
-        if len(all_products) >= max_products:
+        if len(all_products) >= max_products * 2:  # Get more products initially
             break
     
     # Remove duplicates based on product_id
@@ -223,86 +184,146 @@ def search_products(brand: str, max_products: int = 50) -> List[Dict[str, Any]]:
     
     return list(unique_products.values())
 
+from typing import List, Dict, Any
+
 def extract_products(data: Dict[str, Any], brand: str) -> List[Dict[str, Any]]:
-    """Extract relevant products with improved filtering."""
+    """Extract products with relaxed brand filtering to get more results."""
     products = []
-    
+
+    # Normalize brand once
+    brand_lower = brand.lower()
+    brand_words = brand_lower.split()  # Split brand into words for partial matching
+
     for item in data.get("shopping_results", []):
-        title = item.get("title", "")
-        
-        # More flexible brand matching
-        brand_score = max(
-            fuzz.partial_ratio(title.lower(), brand.lower()),
-            fuzz.token_sort_ratio(title.lower(), brand.lower()),
-            fuzz.token_set_ratio(title.lower(), brand.lower())
-        )
-        
-        # Lower threshold but add quality filters
-        if brand_score > 60:  # Reduced from 70
+        title = item.get("title", "").lower()
+        source = item.get("source", "")
+        source_name = source.get("name", "") if isinstance(source, dict) else str(source)
+        source_name_lower = source_name.lower()
+
+        # ✅ Relaxed matching: brand name OR any brand word in title or source
+        brand_match = False
+        if brand_lower in title or brand_lower in source_name_lower:
+            brand_match = True
+        else:
+            # Check for partial word matches
+            for word in brand_words:
+                if len(word) > 2 and (word in title or word in source_name_lower):
+                    brand_match = True
+                    break
+
+        if brand_match:
             rating = item.get("rating")
             reviews_count = item.get("reviews")
-            
-            # Prioritize products with ratings and reviews
+
+            # Safe rating conversion
+            try:
+                rating = float(rating) if rating is not None else None
+            except (ValueError, TypeError):
+                rating = None
+
+            # Safe review count conversion
+            try:
+                reviews_count = int(reviews_count) if reviews_count is not None else 0
+            except (ValueError, TypeError):
+                reviews_count = 0
+
+            # Simple quality score
             quality_score = 0
             if rating is not None:
                 quality_score += rating * 10
-            if reviews_count is not None:
-                quality_score += min(reviews_count, 100)  # Cap at 100 for scoring
-            
+            if reviews_count > 0:
+                quality_score += min(reviews_count, 100)
+
             product_data = {
-                "product_name": title,
+                "product_name": item.get("title"),
                 "product_id": item.get("product_id"),
                 "rating": rating,
                 "reviews": reviews_count,
                 "link": item.get("link"),
                 "price": item.get("price"),
-                "brand_match_score": brand_score,
+                "brand_match_score": 100,  # Fixed, since it matched our criteria
                 "quality_score": quality_score,
-                "source": item.get("source")["name"] if isinstance(item.get("source"), dict) else item.get("source", ""),
-
+                "source": source_name,
                 "thumbnail": item.get("thumbnail")
             }
             products.append(product_data)
-    
+
     return products
 
-def select_best_products(products: List[Dict[str, Any]], max_products: int = 15) -> List[Dict[str, Any]]:
-    """Select the best products for review scraping using multiple criteria."""
+
+def select_best_products(products: List[Dict[str, Any]], max_products: int = 10) -> List[Dict[str, Any]]:
+    """Select products in 3 groups: 10 best rated + 10 worst rated + 10 most reviewed."""
     
-    # Filter out products without product_id or with very low brand match
-    valid_products = [
-        p for p in products 
-        if p.get("product_id") and p.get("brand_match_score", 0) > 70
-    ]
+    # Filter out products without product_id
+    valid_products = [p for p in products if p.get("product_id")]
     
     if not valid_products:
-        # Fallback to any products with product_id
-        valid_products = [p for p in products if p.get("product_id")]
+        return []
     
-    # Sort by composite score
-    def composite_score(product):
-        brand_score = product.get("brand_match_score", 0) * 0.3
-        quality_score = product.get("quality_score", 0) * 0.7
-        return brand_score + quality_score
+    # Separate products with ratings from those without
+    products_with_ratings = [p for p in valid_products if p.get("rating") is not None]
+    products_without_ratings = [p for p in valid_products if p.get("rating") is None]
     
-    sorted_products = sorted(valid_products, key=composite_score, reverse=True)
+    selected_products = []
+    used_product_ids = set()
     
-    # Select diverse products (avoid too many from same source)
-    selected = []
-    source_count = {}
-    
-    for product in sorted_products:
-        source = product.get("source", "unknown")
+    # Group 1: Top 10 best rated products
+    if products_with_ratings:
+        best_rated = sorted(products_with_ratings, 
+                          key=lambda x: (x.get("rating", 0), x.get("reviews", 0)), 
+                          reverse=True)[:10]
         
-        # Limit products per source
-        if source_count.get(source, 0) < 3:  # Max 3 products per source
-            selected.append(product)
-            source_count[source] = source_count.get(source, 0) + 1
-            
-            if len(selected) >= max_products:
-                break
+        for product in best_rated:
+            if product.get("product_id") not in used_product_ids:
+                selected_products.append(product)
+                used_product_ids.add(product.get("product_id"))
+        
+        print(f"    ⭐ Selected {len([p for p in best_rated if p.get('product_id') not in used_product_ids or p.get('product_id') in [sp.get('product_id') for sp in selected_products]])} best rated products")
     
-    return selected
+    # Group 2: Top 10 worst rated products (but still with ratings)
+    if products_with_ratings and len(products_with_ratings) > 1:
+        worst_rated = sorted(products_with_ratings, 
+                           key=lambda x: (x.get("rating", 5), -x.get("reviews", 0)), 
+                           reverse=False)[:10]
+        
+        group2_added = 0
+        for product in worst_rated:
+            if product.get("product_id") not in used_product_ids:
+                selected_products.append(product)
+                used_product_ids.add(product.get("product_id"))
+                group2_added += 1
+        
+        print(f"    📉 Selected {group2_added} worst rated products")
+    
+    # Group 3: Top 10 most reviewed products (regardless of rating)
+    all_products_sorted_by_reviews = sorted(valid_products, 
+                                          key=lambda x: x.get("reviews", 0), 
+                                          reverse=True)[:10]
+    
+    group3_added = 0
+    for product in all_products_sorted_by_reviews:
+        if product.get("product_id") not in used_product_ids:
+            selected_products.append(product)
+            used_product_ids.add(product.get("product_id"))
+            group3_added += 1
+    
+    print(f"    💬 Selected {group3_added} most reviewed products")
+    
+    # If we still don't have enough products, add remaining valid products
+    if len(selected_products) < max_products:
+        remaining_needed = max_products - len(selected_products)
+        remaining_products = [p for p in valid_products 
+                            if p.get("product_id") not in used_product_ids]
+        
+        # Sort remaining by quality score
+        remaining_products.sort(key=lambda x: x.get("quality_score", 0), reverse=True)
+        
+        for product in remaining_products[:remaining_needed]:
+            selected_products.append(product)
+            used_product_ids.add(product.get("product_id"))
+    
+    print(f"    ✅ Total selected: {len(selected_products)} products")
+    return selected_products[:max_products]
 
 def process_brand_reviews(brand_name: str) -> List[Dict[str, Any]]:
     """Process reviews for a specific brand with improved strategy."""
@@ -319,7 +340,7 @@ def process_brand_reviews(brand_name: str) -> List[Dict[str, Any]]:
     print(f"📦 Found {len(all_products)} total products")
     
     # Select best products for review scraping
-    selected_products = select_best_products(all_products, max_products=15)
+    selected_products = select_best_products(all_products, max_products=10)
     print(f"✅ Selected {len(selected_products)} products for review scraping")
     
     # Display selected products
@@ -341,14 +362,28 @@ def process_brand_reviews(brand_name: str) -> List[Dict[str, Any]]:
                 
             print(f"\n📊 Product {i}/{len(selected_products)}: {product.get('product_name', 'Unknown')[:50]}...")
             
-            # Adjust pages based on expected review count
-            expected_reviews = product.get("reviews", 0)
-            if expected_reviews > 500:
-                min_pages, max_pages = 8, 20
-            elif expected_reviews > 100:
-                min_pages, max_pages = 5, 15
-            else:
-                min_pages, max_pages = 3, 10
+            # With this safe version:
+            def get_page_limits_based_on_reviews(product):
+                expected_reviews = product.get("reviews", 0)
+                
+                # Handle None values
+                if expected_reviews is None:
+                    expected_reviews = 0
+                
+                try:
+                    expected_reviews = int(expected_reviews)
+                except (ValueError, TypeError):
+                    expected_reviews = 0
+                
+                if expected_reviews > 500:
+                    return 8, 20
+                elif expected_reviews > 100:
+                    return 5, 15
+                else:
+                    return 3, 10
+
+            # Then use it like this:
+            min_pages, max_pages = get_page_limits_based_on_reviews(product)
                 
             review_data = fetch_reviews(product_id, min_pages=min_pages, max_pages=max_pages)
             review_data["product_name"] = product.get("product_name")
@@ -546,107 +581,107 @@ def scrape_reddit_reviews_node(state: BrandAnalysisState) -> BrandAnalysisState:
 # TWITTER NODE
 # ========================
 
-async def initialize_twitter_api() -> Optional[API]:
-    """Initialize Twitter API with account pool."""
-    try:
-        pool = AccountsPool()
+# async def initialize_twitter_api() -> Optional[API]:
+#     """Initialize Twitter API with account pool."""
+#     try:
+#         pool = AccountsPool()
         
 
-        username1 = os.getenv("username1")
-        password1 = os.getenv("password1")
-        email1 = os.getenv("email1")
-        email_pass1 = os.getenv("email_pass1")
+#         username1 = os.getenv("username1")
+#         password1 = os.getenv("password1")
+#         email1 = os.getenv("email1")
+#         email_pass1 = os.getenv("email_pass1")
 
-        username2 = os.getenv("username2")
-        password2 = os.getenv("password2")
-        email2 = os.getenv("email2")
-        email_pass2 = os.getenv("email_pass2")
+#         username2 = os.getenv("username2")
+#         password2 = os.getenv("password2")
+#         email2 = os.getenv("email2")
+#         email_pass2 = os.getenv("email_pass2")
         
-        await pool.add_account(username1, password1, email1, email_pass1)
-        await pool.add_account(username2, password2, email2, email_pass2)
-        await pool.login_all()
-        print("✅ Twitter API initialized")
-        return API(pool)
+#         await pool.add_account(username1, password1, email1, email_pass1)
+#         await pool.add_account(username2, password2, email2, email_pass2)
+#         await pool.login_all()
+#         print("✅ Twitter API initialized")
+#         return API(pool)
         
-    except Exception as e:
-        print(f"❌ Error initializing Twitter API: {e}")
-        return None
+#     except Exception as e:
+#         print(f"❌ Error initializing Twitter API: {e}")
+#         return None
 
-async def scrape_twitter_data(brand_handle: str) -> Dict[str, List[Dict[str, Any]]]:
-    """Scrape Twitter data for a brand."""
-    api = await initialize_twitter_api()
-    if not api:
-        return {"brand_own": [], "mentions": []}
+# async def scrape_twitter_data(brand_handle: str) -> Dict[str, List[Dict[str, Any]]]:
+#     """Scrape Twitter data for a brand."""
+#     api = await initialize_twitter_api()
+#     if not api:
+#         return {"brand_own": [], "mentions": []}
     
-    brand_own = []
-    mentions = []
+#     brand_own = []
+#     mentions = []
     
-    try:
-        # Get user info
-        user = await api.user_by_login(brand_handle)
-        print(f"✅ Found Twitter user: @{brand_handle}")
+#     try:
+#         # Get user info
+#         user = await api.user_by_login(brand_handle)
+#         print(f"✅ Found Twitter user: @{brand_handle}")
         
-        # Get brand's own tweets (limited)
-        tweet_count = 0
-        async for tweet in api.user_tweets_and_replies(user.id, limit=50):
-            if tweet_count >= 20:  # Limit to prevent long waits
-                break
+#         # Get brand's own tweets (limited)
+#         tweet_count = 0
+#         async for tweet in api.user_tweets_and_replies(user.id, limit=50):
+#             if tweet_count >= 20:  # Limit to prevent long waits
+#                 break
                 
-            brand_own.append({
-                "id": tweet.id,
-                "content": tweet.rawContent,
-                "created_at": str(tweet.date),
-                "likes": tweet.likeCount,
-                "retweets": tweet.retweetCount,
-            })
-            tweet_count += 1
-            await asyncio.sleep(1)
+#             brand_own.append({
+#                 "id": tweet.id,
+#                 "content": tweet.rawContent,
+#                 "created_at": str(tweet.date),
+#                 "likes": tweet.likeCount,
+#                 "retweets": tweet.retweetCount,
+#             })
+#             tweet_count += 1
+#             await asyncio.sleep(1)
         
-        # Get mentions (limited)
-        mention_count = 0
-        async for tweet in api.search(f"@{brand_handle}", limit=20):
-            if mention_count >= 10:  # Limit mentions
-                break
+#         # Get mentions (limited)
+#         mention_count = 0
+#         async for tweet in api.search(f"@{brand_handle}", limit=20):
+#             if mention_count >= 10:  # Limit mentions
+#                 break
                 
-            if tweet.user.username.lower() != brand_handle.lower():
-                mentions.append({
-                    "id": tweet.id,
-                    "username": tweet.user.username,
-                    "content": tweet.rawContent,
-                    "created_at": str(tweet.date),
-                    "likes": tweet.likeCount,
-                })
-                mention_count += 1
+#             if tweet.user.username.lower() != brand_handle.lower():
+#                 mentions.append({
+#                     "id": tweet.id,
+#                     "username": tweet.user.username,
+#                     "content": tweet.rawContent,
+#                     "created_at": str(tweet.date),
+#                     "likes": tweet.likeCount,
+#                 })
+#                 mention_count += 1
             
-            await asyncio.sleep(1)
+#             await asyncio.sleep(1)
             
-    except Exception as e:
-        print(f"Error scraping Twitter data: {e}")
+#     except Exception as e:
+#         print(f"Error scraping Twitter data: {e}")
     
-    return {"brand_own": brand_own, "mentions": mentions}
+#     return {"brand_own": brand_own, "mentions": mentions}
 
-def scrape_twitter_mentions_node(state: BrandAnalysisState) -> BrandAnalysisState:
-    """LangGraph node for scraping Twitter mentions."""
-    print("[Twitter] Scraping tweets and mentions...")
+# def scrape_twitter_mentions_node(state: BrandAnalysisState) -> BrandAnalysisState:
+#     """LangGraph node for scraping Twitter mentions."""
+#     print("[Twitter] Scraping tweets and mentions...")
     
-    try:
-        twitter_handle = state.get("twitter_handle")
-        brand_name = state.get("brand_name", "")
+#     try:
+#         twitter_handle = state.get("twitter_handle")
+#         brand_name = state.get("brand_name", "")
         
-        # Try to derive handle from brand name if not provided
-        if not twitter_handle:
-            twitter_handle = brand_name.lower().replace(" ", "_").replace(".", "")
+#         # Try to derive handle from brand name if not provided
+#         if not twitter_handle:
+#             twitter_handle = brand_name.lower().replace(" ", "_").replace(".", "")
         
-        if twitter_handle:
-            twitter_handle = twitter_handle.lstrip('@')
-            twitter_data = asyncio.run(scrape_twitter_data(twitter_handle))
-            return {**state, "twitter_data": twitter_data}
-        else:
-            return {**state, "twitter_data": {"brand_own": [], "mentions": []}}
+#         if twitter_handle:
+#             twitter_handle = twitter_handle.lstrip('@')
+#             twitter_data = asyncio.run(scrape_twitter_data(twitter_handle))
+#             return {**state, "twitter_data": twitter_data}
+#         else:
+#             return {**state, "twitter_data": {"brand_own": [], "mentions": []}}
             
-    except Exception as e:
-        print(f"❌ Error in Twitter node: {e}")
-        return {**state, "twitter_data": {"brand_own": [], "mentions": []}}
+#     except Exception as e:
+#         print(f"❌ Error in Twitter node: {e}")
+#         return {**state, "twitter_data": {"brand_own": [], "mentions": []}}
 
 # ========================
 # WEBSITE ANALYSIS NODE
@@ -1079,45 +1114,92 @@ class BrandTrustScorer:
         self.model = genai.GenerativeModel("gemini-2.5-pro")
 
     def _call_component_analyzer(self, prompt: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Call Gemini to analyze a component"""
+        """Enhanced component analyzer with better error handling and fallback"""
+        if not self.model:
+            print("  ⚠️  Gemini model not available, using fallback scoring")
+            return self._fallback_scoring(data)
+        
         try:
+            # Prepare the input with length limit
+            data_str = json.dumps(data, indent=2)[:1000]  # Limit data size
+            full_prompt = f"{prompt}\n\nData to analyze:\n{data_str}"
+        
+            print(f"  🤖 Calling Gemini API (prompt length: {len(full_prompt)} chars)")
+        
+            # Generate content with timeout handling
             response = self.model.generate_content(
-                prompt + "\n\n" + json.dumps(data, indent=2)[:3000]
+                full_prompt,
+                generation_config={
+                    "temperature": 0.3,
+                    "top_p": 0.8,
+                    "max_output_tokens": 1024
+                }
             )
-            
+        
             if not response or not response.text:
-                print(f"❌ Component analysis failed: Empty response from Gemini")
-                return {"error": "Empty response from Gemini", "score": 5.0}
+                print("  ❌ Empty response from Gemini")
+                return self._fallback_scoring(data)
+        
+            response_text = response.text.strip()
+            print(f"  📥 Received response ({len(response_text)} chars)")
+        
+            # Enhanced JSON extraction
+            # First try to find JSON block
+            json_patterns = [
+                r'```json\s*(\{.*?\})\s*```',  # JSON in code block
+                r'```\s*(\{.*?\})\s*```',      # JSON in generic code block  
+                r'(\{[^{}]*"[^"]*"[^{}]*:[^{}]*\})',  # Simple JSON pattern
+                r'(\{.*\})'                     # Any curly braces content
+            ]
+        
+            parsed_result = None
+            for pattern in json_patterns:
+                matches = re.findall(pattern, response_text, re.DOTALL)
+                for match in matches:
+                    try:
+                        parsed_result = json.loads(match)
+                        print(f"  ✅ Successfully parsed JSON using pattern")
+                        break
+                    except json.JSONDecodeError:
+                        continue
+                if parsed_result:
+                    break       
+            if parsed_result:
+                return parsed_result
+            else:
+                print(f"  ⚠️  Could not parse JSON from response")
+                print(f"  Response preview: {response_text[:200]}...")
+                return self._fallback_scoring(data)
             
-            text = response.text.strip()
-            
-            # Try to extract JSON from the response if it's wrapped in markdown
-            if "```json" in text:
-                json_start = text.find("```json") + 7
-                json_end = text.find("```", json_start)
-                if json_end != -1:
-                    text = text[json_start:json_end].strip()
-            elif "```" in text:
-                # Handle cases where JSON is in code blocks without language specification
-                json_start = text.find("```") + 3
-                json_end = text.find("```", json_start)
-                if json_end != -1:
-                    text = text[json_start:json_end].strip()
-            
-            if not text:
-                print(f"❌ Component analysis failed: No valid JSON content found")
-                return {"error": "No valid JSON content found", "score": 5.0}
-            
-            result = json.loads(text)
-            return result
-            
-        except json.JSONDecodeError as e:
-            print(f"❌ Component analysis failed: JSON decode error - {e}")
-            print(f"Raw response: {text[:200] if 'text' in locals() else 'No response text'}")
-            return {"error": f"JSON decode error: {str(e)}", "score": 5.0}
         except Exception as e:
-            print(f"❌ Component analysis failed: {e}")
-            return {"error": str(e), "score": 5.0}
+            print(f"  ❌ Gemini API call failed: {e}")
+            return self._fallback_scoring(data)
+
+    def _fallback_scoring(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Improved fallback scoring with some basic logic"""
+        # Try to extract some basic info for better fallback scores
+        base_score = 5.5  # Slightly above middle
+        
+        # Adjust based on available data
+        if isinstance(data, dict):
+            if data.get("reviews_in_chunk", 0) > 10:
+                base_score += 0.5  # More data available
+            if data.get("total_reviews_analyzed", 0) > 50:
+                base_score += 0.3  # Large dataset
+        
+        return {
+            "review_sentiment_score": round(base_score, 1),
+            "confidence_level": "Low",
+            "key_factors": ["Fallback scoring - API unavailable", "Score estimated based on data volume"],
+            "analysis_summary": {
+                "total_reviews_analyzed": data.get("reviews_in_chunk", 0) if isinstance(data, dict) else 0,
+                "sentiment_distribution": "Unable to analyze - using fallback",
+                "major_themes": {"positive": [], "negative": []},
+                "product_consistency": "Unable to determine",
+                "severity_assessment": "API fallback mode"
+            },
+            "_fallback": True
+        }
     def analyze_ratings(self, google_reviews: List[Dict]) -> Dict[str, Any]:
         """Analyze ratings component (50% weight)"""
         prompt = """Analyze the Google reviews data and provide a ratings score from 0-10.
@@ -1170,51 +1252,168 @@ Return JSON: {"business_legitimacy_score": 8.2, "confidence_level": "High", "key
         
         return self._call_component_analyzer(prompt, website_trust_data)
     
-    def analyze_review_sentiment(self, google_reviews: List[Dict], reddit_reviews: List[Dict]) -> Dict[str, Any]:
-        """Analyze review sentiment component (15% weight)"""
-        prompt = """Analyze review sentiment and provide a score from 0-10.
 
-Scoring Criteria:
-- 8.5-10.0: Outstanding - consistently positive reviews
-- 7.0-8.4: Good - generally positive feedback
-- 6.0-6.9: Decent - mixed but mostly positive
-- 4.5-5.9: Below Average - more complaints than praise
-- 0-4.4: Poor - predominantly negative
-
-Return JSON: {"review_sentiment_score": 6.8, "confidence_level": "High", "key_factors": ["factor1", "factor2"]}"""
-        
-        # Simplified sentiment data
-        total_reviews = len(google_reviews) + len(reddit_reviews)
-        data = {
-            "google_reviews_count": len(google_reviews),
-            "reddit_reviews_count": len(reddit_reviews),
-            "total_reviews": total_reviews
-        }
-        
-        return self._call_component_analyzer(prompt, data)
+#     def analyze_review_sentiment(self, google_reviews: List[Dict], reddit_reviews: List[Dict]) -> Dict[str, Any]:
     
-    def analyze_social_media(self, twitter_data: Dict, reddit_reviews: List[Dict]) -> Dict[str, Any]:
-        """Analyze social media component (10% weight)"""
-        prompt = """Analyze social media data and provide a score from 0-10.
-
-Social media is inherently negative-biased. Score conservatively.
-
-Scoring Criteria:
-- 8.0-10.0: Positive mentions or minimal negative presence
-- 6.0-7.9: Normal negative bias, no extreme patterns
-- 4.0-5.9: Some concerning patterns
-- 2.0-3.9: Widespread negative patterns
-- 0-1.9: Extreme negative patterns
-
-Return JSON: {"social_media_score": 6.5, "confidence_level": "Medium", "key_factors": ["factor1", "factor2"]}"""
+#         # Extract actual review text from the data structure
+#         all_review_texts = []
         
-        data = {
-            "twitter_mentions": len(twitter_data.get("mentions", [])),
-            "twitter_own_tweets": len(twitter_data.get("brand_own", [])),
-            "reddit_posts": len(reddit_reviews)
-        }
+#         # Process Google Reviews
+#         for product_data in google_reviews:
+#             if isinstance(product_data, dict) and "reviews" in product_data:
+#                 for review in product_data["reviews"]:
+#                     if isinstance(review, dict):
+#                         content = review.get("content", "")
+#                         rating = review.get("rating", 0)
+#                         if content and len(content.strip()) > 10:
+#                             all_review_texts.append({
+#                                 "text": content,
+#                                 "rating": rating,
+#                                 "source": "Google"
+#                             })
         
-        return self._call_component_analyzer(prompt, data)
+#         # Process Reddit Reviews
+#         for reddit_post in reddit_reviews:
+#             if isinstance(reddit_post, dict):
+#                 # Add post content
+#                 post_text = reddit_post.get("post_text", "")
+#                 if post_text and len(post_text.strip()) > 10:
+#                     all_review_texts.append({
+#                         "text": post_text,
+#                         "rating": "N/A",
+#                         "source": "Reddit"
+#                     })
+                
+#                 # Add comment content
+#                 comments = reddit_post.get("comments", [])
+#                 for comment in comments[:3]:  # Limit comments per post
+#                     comment_text = comment.get("body", "")
+#                     if comment_text and len(comment_text.strip()) > 10:
+#                         all_review_texts.append({
+#                             "text": comment_text,
+#                             "rating": "N/A", 
+#                             "source": "Reddit"
+#                         })
+        
+#         print(f"  📝 Extracted {len(all_review_texts)} review texts for sentiment analysis")
+        
+#         # If no reviews found, return default
+#         if not all_review_texts:
+#             return {
+#                 "review_sentiment_score": 5.0,
+#                 "confidence_level": "Low",
+#                 "key_factors": ["No review text available for sentiment analysis"],
+#                 "analysis_summary": {
+#                     "total_reviews_analyzed": 0,
+#                     "sentiment_distribution": "No reviews available",
+#                     "major_themes": {"positive": [], "negative": []},
+#                     "product_consistency": "No data",
+#                     "severity_assessment": "No reviews to assess"
+#                 }
+#             }
+        
+#         # Prepare review data for analysis (limit to avoid token limits)
+#         google_reviews_text = ""
+#         reddit_reviews_text = ""
+        
+#         # Take up to 50 reviews to avoid overwhelming the API
+#         limited_reviews = all_review_texts
+        
+#         for review in limited_reviews:
+#             review_line = f"Rating: {review['rating']}, Text: {review['text']}\n"
+#             if review['source'] == 'Google':
+#                 google_reviews_text += review_line
+#             else:
+#                 reddit_reviews_text += review_line
+        
+#         if not google_reviews_text:
+#             google_reviews_text = "No Google reviews available"
+#         if not reddit_reviews_text:
+#             reddit_reviews_text = "No Reddit reviews available"
+        
+#         # Create the analysis prompt
+#         prompt = f"""You are a Review Sentiment Specialist analyzing the emotional tone and themes in customer review text. timent on 0-10 scale.
+
+#         REVIEWS DATA ({len(limited_reviews)} reviews):
+
+#         Google Reviews: 
+#         {google_reviews_text}
+
+#         Reddit Reviews:
+#         {reddit_reviews_text}
+
+
+
+#         SENTIMENT SCORING FORMULA:
+
+# Count sentiment expressions in review text:
+
+# Positive language: "love", "amazing", "excellent", "great quality", "recommend"
+# Negative language: "hate", "terrible", "poor", "disappointed", "waste of money"
+
+
+# Calculate sentiment ratio:
+
+# Reviews with positive sentiment / Total reviews with clear sentiment = X%
+
+
+# Apply base score:
+
+# 80%+ positive sentiment = 9.0-10.0
+# 70-79% positive sentiment = 8.0-8.9
+# 60-69% positive sentiment = 7.0-7.9
+# 50-59% positive sentiment = 6.0-6.9
+# 40-49% positive sentiment = 5.0-5.9
+# 30-39% positive sentiment = 4.0-4.9
+# Below 30% = 0-3.9
+
+
+# Theme deductions (from text analysis):
+
+# "Poor quality/cheap/flimsy" mentioned 15+ times: -1.0
+# "Broke/fell apart/defective" mentioned 10+ times: -1.5
+# "Terrible service/rude staff" mentioned 8+ times: -0.8"""
+
+#         try:
+#             # Call the LLM analyzer
+#             result = self._call_component_analyzer(prompt, {
+#                 "total_reviews": len(all_review_texts),
+#                 "reviews_analyzed": len(limited_reviews)
+#             })
+            
+#             if result and 'review_sentiment_score' in result:
+#                 print(f"  ✅ Sentiment analysis complete: {result['review_sentiment_score']}")
+#                 return result
+#             else:
+#                 print(f"  ⚠️  LLM analysis failed, using fallback")
+#                 # Fallback scoring based on ratings
+#                 return self._fallback_sentiment_scoring(limited_reviews)
+                
+#         except Exception as e:
+#             print(f"  ❌ Error in sentiment analysis: {e}")
+    
+#     def analyze_social_media(self, twitter_data: Dict, reddit_reviews: List[Dict]) -> Dict[str, Any]:
+#         """Analyze social media component (10% weight)"""
+#         prompt = """Analyze social media data and provide a score from 0-10.
+
+# Social media is inherently negative-biased. Score conservatively.
+
+# Scoring Criteria:
+# - 8.0-10.0: Positive mentions or minimal negative presence
+# - 6.0-7.9: Normal negative bias, no extreme patterns
+# - 4.0-5.9: Some concerning patterns
+# - 2.0-3.9: Widespread negative patterns
+# - 0-1.9: Extreme negative patterns
+
+# Return JSON: {"social_media_score": 6.5, "confidence_level": "Medium", "key_factors": ["factor1", "factor2"]}"""
+        
+#         data = {
+#             # "twitter_mentions": len(twitter_data.get("mentions", [])),
+#             # "twitter_own_tweets": len(twitter_data.get("brand_own", [])),
+#             "reddit_posts": len(reddit_reviews)
+#         }
+        
+#         return self._call_component_analyzer(prompt, data)
     
     def analyze_customer_support(self, google_reviews: List[Dict], reddit_reviews: List[Dict]) -> Dict[str, Any]:
         """Analyze customer support component (10% weight)"""
@@ -1264,7 +1463,7 @@ Return JSON: {"customer_support_score": 7.2, "confidence_level": "Medium", "key_
         
         print("  Analyzing social media...")
         component_scores['social_media'] = self.analyze_social_media(
-            state.get("twitter_data", {}),
+            # state.get("twitter_data", {}),
             state.get("reddit_reviews", [])
         )
         
@@ -1354,7 +1553,7 @@ class BrandAnalyzer:
         collection_status = {
             "google_reviews": "pending",
             "reddit_reviews": "pending", 
-            "twitter_data": "pending",
+            # "twitter_data": "pending",
             "website_analysis": "pending"
         }
         
@@ -1364,7 +1563,7 @@ class BrandAnalyzer:
             "errors": errors,
             "google_reviews": [],
             "reddit_reviews": [],
-            "twitter_data": {},
+            # "twitter_data": {},
             "website_trust_data": {}
         }
     
@@ -1395,14 +1594,14 @@ class BrandAnalyzer:
                 print(f"❌ Reddit reviews failed: {e}")
                 return ("reddit_reviews", [], f"failed: {str(e)}")
         
-        def collect_twitter_data():
-            try:
-                print("🐦 Collecting Twitter data...")
-                result = scrape_twitter_mentions_node(state)
-                return ("twitter_data", result.get("twitter_data", {}), "completed")
-            except Exception as e:
-                print(f"❌ Twitter data failed: {e}")
-                return ("twitter_data", {}, f"failed: {str(e)}")
+        # def collect_twitter_data():
+        #     try:
+        #         print("🐦 Collecting Twitter data...")
+        #         result = scrape_twitter_mentions_node(state)
+        #         return ("twitter_data", result.get("twitter_data", {}), "completed")
+        #     except Exception as e:
+        #         print(f"❌ Twitter data failed: {e}")
+        #         return ("twitter_data", {}, f"failed: {str(e)}")
         
         def collect_website_data():
             try:
@@ -1414,7 +1613,8 @@ class BrandAnalyzer:
                 return ("website_trust_data", {}, f"failed: {str(e)}")
         
         # Execute tasks in parallel
-        tasks = [collect_google_reviews, collect_reddit_reviews, collect_twitter_data, collect_website_data]
+        # tasks = [collect_google_reviews, collect_reddit_reviews, collect_twitter_data, collect_website_data]
+        tasks = [collect_google_reviews, collect_reddit_reviews, collect_website_data]
         results = {}
         collection_status = state["collection_status"].copy()
         
@@ -1458,24 +1658,58 @@ class BrandAnalyzer:
             }
     
     def generate_report_node(self, state: BrandAnalysisState) -> BrandAnalysisState:
-        """Generate final analysis report"""
+        """Generate final analysis report with complete component data"""
         print("📝 Generating final report...")
         
         try:
             report_generator = ReportGenerator()
             final_report = report_generator.generate_comprehensive_report(state)
             
+            # ADD: Ensure trust_score data is properly included
+            trust_score = state.get("trust_score", {})
+            if trust_score:
+                final_report["trust_score_summary"] = {
+                    "final_score": trust_score.get("final_score", 0),
+                    "component_breakdown": trust_score.get("component_breakdown", {}),
+                    "component_results": trust_score.get("component_results", {})
+                }
+            
         except Exception as e:
             print(f"❌ Report generation failed: {e}")
-            final_report = {"error": str(e)}
+            final_report = {
+                "error": str(e),
+                "brand_name": state.get("brand_name", "Unknown"),
+                "trust_score_summary": state.get("trust_score", {})
+            }
             state = {
                 **state,
                 "errors": state.get("errors", []) + [f"Report generation failed: {str(e)}"]
             }
         
-        # Always try to save JSON files, regardless of report generation success
+        # Always save JSON files with complete data
         filename = f"{state['brand_name'].lower().replace(' ', '_')}_analysis.json"
-        self.save_json_files(filename, final_report)
+        
+        # ADD: Enhanced data structure for JSON save
+        complete_data = {
+            **final_report,
+            "complete_analysis_data": {
+                "google_reviews_summary": {
+                    "total_products": len(state.get("google_reviews", [])),
+                    "total_reviews_collected": sum(len(product.get("reviews", [])) for product in state.get("google_reviews", []))
+                },
+                "reddit_data_summary": {
+                    "total_posts": len(state.get("reddit_reviews", [])),
+                    "subreddits_found": list(set([r.get("subreddit", "") for r in state.get("reddit_reviews", []) if r.get("subreddit")]))
+                },
+                # "twitter_data_summary": {
+                #     "brand_tweets": len(state.get("twitter_data", {}).get("brand_own", [])),
+                #     "mentions_found": len(state.get("twitter_data", {}).get("mentions", []))
+                # },
+                "website_analysis_summary": state.get("website_trust_data", {})
+            }
+        }
+        
+        self.save_json_files(filename, complete_data)
 
         return {
             **state,
@@ -1556,13 +1790,47 @@ class BrandTrustScorer:
             
             response_text = response.text.strip()
             
-            # Try to extract JSON from the response
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                return json.loads(json_str)
+            # Try to extract JSON from the response with better handling
+            # First try to find complete JSON in code blocks
+            json_patterns = [
+                r'```json\s*(\{.*?\})\s*```',  # JSON in code block
+                r'```\s*(\{.*?\})\s*```',      # JSON in generic code block
+                r'(\{[^{}]*"[^"]*"[^{}]*:[^{}]*\})',  # Simple JSON pattern
+                r'(\{.*\})'                     # Any curly braces content
+            ]
+            
+            parsed_result = None
+            for pattern in json_patterns:
+                matches = re.findall(pattern, response_text, re.DOTALL)
+                for match in matches:
+                    try:
+                        # Try to parse the JSON
+                        parsed_result = json.loads(match)
+                        break
+                    except json.JSONDecodeError:
+                        # If JSON is incomplete, try to fix common issues
+                        try:
+                            # Add missing closing braces/brackets
+                            fixed_json = match
+                            if fixed_json.count('{') > fixed_json.count('}'):
+                                fixed_json += '}' * (fixed_json.count('{') - fixed_json.count('}'))
+                            if fixed_json.count('[') > fixed_json.count(']'):
+                                fixed_json += ']' * (fixed_json.count('[') - fixed_json.count(']'))
+                            
+                            # Try to parse the fixed JSON
+                            parsed_result = json.loads(fixed_json)
+                            print(f"  ✅ Fixed truncated JSON response")
+                            break
+                        except json.JSONDecodeError:
+                            continue
+                if parsed_result:
+                    break
+            
+            if parsed_result:
+                return parsed_result
             else:
-                print(f"⚠️  No JSON found in response: {response_text[:200]}...")
+                print(f"⚠️  Could not parse JSON from response")
+                print(f"Response preview: {response_text[:300]}...")
                 return self._fallback_scoring(data)
                 
         except json.JSONDecodeError as e:
@@ -1634,38 +1902,200 @@ Return JSON format:
 }"""
         
         return self._call_component_analyzer(prompt, website_trust_data)
-    
+
+
+
+
+
+
+
+
+
+
     def analyze_review_sentiment(self, google_reviews: List[Dict], reddit_reviews: List[Dict]) -> Dict[str, Any]:
-        """Analyze review sentiment component (15% weight - increased from 10%)"""
-        prompt = """You are a Review Sentiment Specialist. Analyze review themes and sentiment patterns.
-
-Scoring Criteria:
-- 8.5-10.0: Outstanding - consistently glowing reviews, net positive ratio >3:1
-- 7.0-8.4: Good - generally positive feedback, ratio 2-3:1
-- 6.0-6.9: Decent - mixed but mostly positive, ratio 1.3-2:1
-- 4.5-5.9: Below Average - more complaints than praise, ratio 0.7-1.3:1
-- 0-4.4: Poor - predominantly negative, ratio <0.7:1
-
-Return JSON format:
-{
-  "review_sentiment_score": 6.8,
-  "confidence_level": "High",
-  "positive_negative_ratio": 2.1,
-  "key_factors": [
-    "Positive themes dominate with style and comfort praise",
-    "Some durability concerns but manageable",
-    "Overall satisfied customer base"
-  ],
-  "scoring_rationale": "Good score due to 2.1:1 positive/negative ratio"
-}"""
-        
-        # Combine review data
-        all_reviews = google_reviews + reddit_reviews
-        sentiment_data = self._prepare_sentiment_data(all_reviews)
-        return self._call_component_analyzer(prompt, sentiment_data)
     
-    def analyze_social_media(self, twitter_data: Dict, reddit_reviews: List[Dict]) -> Dict[str, Any]:
+        # Extract actual review text from the data structure
+        all_review_texts = []
+        
+        # Process Google Reviews
+        for product_data in google_reviews:
+            if isinstance(product_data, dict) and "reviews" in product_data:
+                for review in product_data["reviews"]:
+                    if isinstance(review, dict):
+                        content = review.get("content", "")
+                        rating = review.get("rating", 0)
+                        if content and len(content.strip()) > 10:
+                            all_review_texts.append({
+                                "text": content,
+                                "rating": rating,
+                                "source": "Google"
+                            })
+        
+        # Process Reddit Reviews
+        for reddit_post in reddit_reviews:
+            if isinstance(reddit_post, dict):
+                # Add post content
+                post_text = reddit_post.get("post_text", "")
+                if post_text and len(post_text.strip()) > 10:
+                    all_review_texts.append({
+                        "text": post_text,
+                        "rating": "N/A",
+                        "source": "Reddit"
+                    })
+                
+                # Add comment content
+                comments = reddit_post.get("comments", [])
+                for comment in comments[:3]:  # Limit comments per post
+                    comment_text = comment.get("body", "")
+                    if comment_text and len(comment_text.strip()) > 10:
+                        all_review_texts.append({
+                            "text": comment_text,
+                            "rating": "N/A", 
+                            "source": "Reddit"
+                        })
+        
+        print(f"  📝 Extracted {len(all_review_texts)} review texts for sentiment analysis")
+        
+        # If no reviews found, return default
+        if not all_review_texts:
+            return {
+                "review_sentiment_score": 5.0,
+                "confidence_level": "Low",
+                "key_factors": ["No review text available for sentiment analysis"],
+                "analysis_summary": {
+                    "total_reviews_analyzed": 0,
+                    "sentiment_distribution": "No reviews available",
+                    "major_themes": {"positive": [], "negative": []},
+                    "product_consistency": "No data",
+                    "severity_assessment": "No reviews to assess"
+                }
+            }
+        
+        # Prepare review data for analysis (limit to avoid token limits)
+        google_reviews_text = ""
+        reddit_reviews_text = ""
+        
+        # Take up to 50 reviews to avoid overwhelming the API
+        limited_reviews = all_review_texts
+        
+        for review in limited_reviews:
+            review_line = f"Rating: {review['rating']}, Text: {review['text']}\n"
+            if review['source'] == 'Google':
+                google_reviews_text += review_line
+            else:
+                reddit_reviews_text += review_line
+        
+        if not google_reviews_text:
+            google_reviews_text = "No Google reviews available"
+        if not reddit_reviews_text:
+            reddit_reviews_text = "No Reddit reviews available"
+        
+        # Create the analysis prompt
+        reviews_data = f"""REVIEWS DATA ({len(limited_reviews)} reviews):
+
+        Google Reviews: 
+        {google_reviews_text}
+
+        Reddit Reviews:
+        {reddit_reviews_text}"""
+        
+        prompt = f"""You are a Review Sentiment Specialist analyzing the emotional tone and themes in customer review text. Provide a sentiment score on 0-10 scale.
+
+        {reviews_data}
+
+        SENTIMENT SCORING FORMULA:
+
+Count sentiment expressions in review text:
+
+Positive language: "love", "amazing", "excellent", "great quality", "recommend"
+Negative language: "hate", "terrible", "poor", "disappointed", "waste of money"
+
+Calculate sentiment ratio:
+
+Reviews with positive sentiment / Total reviews with clear sentiment = X%
+
+Apply base score:
+
+80%+ positive sentiment = 9.0-10.0
+70-79% positive sentiment = 8.0-8.9
+60-69% positive sentiment = 7.0-7.9
+50-59% positive sentiment = 6.0-6.9
+40-49% positive sentiment = 5.0-5.9
+30-39% positive sentiment = 4.0-4.9
+Below 30% = 0-3.9
+
+Theme deductions (from text analysis):
+
+"Poor quality/cheap/flimsy" mentioned 15+ times: -1.0
+"Broke/fell apart/defective" mentioned 10+ times: -1.5
+"Terrible service/rude staff" mentioned 8+ times: -0.8
+
+Return in JSON format:
+{{
+  "review_sentiment_score": the calculated sentiment score based on analysis,
+  "confidence_level": "High/Medium/Low",
+  "key_factors": [
+    "Brief explanation of main sentiment drivers",
+    "Key themes found in reviews"
+  ],
+  "analysis_summary": {{
+    "total_reviews_analyzed": {len(limited_reviews)},
+    "positive_sentiment_percentage": the calculated positive sentiment percentage based on analysis,
+    "negative_sentiment_percentage": the calculated negative sentiment percentage based on analysis,
+    "major_themes": {{
+      "positive": ["quality", "comfort"],
+      "negative": ["sizing issues"]
+    }}
+  }}
+}}
+"""
+
+
+        try:
+            # Call the LLM analyzer
+            result = self._call_component_analyzer(prompt, {
+                "total_reviews": len(all_review_texts),
+                "reviews_analyzed": len(limited_reviews)
+            })
+            
+            if result and 'review_sentiment_score' in result:
+                print(f"  ✅ Sentiment analysis complete: {result['review_sentiment_score']}")
+                return result
+            else:
+                print(f"  ⚠️  LLM analysis failed, using fallback")
+                # Fallback scoring based on ratings
+                # return self._fallback_sentiment_scoring(limited_reviews)
+                
+        except Exception as e:
+            print(f"  ❌ Error in sentiment analysis: {e}")
+    
+#     def analyze_social_media(self, twitter_data: Dict, reddit_reviews: List[Dict]) -> Dict[str, Any]:
+#         """Analyze social media component (10% weight)"""
+#         prompt = """Analyze social media data and provide a score from 0-10.
+
+# Social media is inherently negative-biased. Score conservatively.
+
+# Scoring Criteria:
+# - 8.0-10.0: Positive mentions or minimal negative presence
+# - 6.0-7.9: Normal negative bias, no extreme patterns
+# - 4.0-5.9: Some concerning patterns
+# - 2.0-3.9: Widespread negative patterns
+# - 0-1.9: Extreme negative patterns
+
+# Return JSON: {"social_media_score": 6.5, "confidence_level": "Medium", "key_factors": ["factor1", "factor2"]}"""
+        
+#         data = {
+#             # "twitter_mentions": len(twitter_data.get("mentions", [])),
+#             # "twitter_own_tweets": len(twitter_data.get("brand_own", [])),
+#             "reddit_posts": len(reddit_reviews)
+#         }
+        
+    def analyze_social_media(self, reddit_reviews: List[Dict]) -> Dict[str, Any]:
         """Analyze social media component (10% weight)"""
+        # Handle None or empty reddit_reviews
+        if not reddit_reviews:
+            reddit_reviews = []
+            
         prompt = """You are a Social Media Pattern Specialist. Identify significant patterns in social media mentions.
 
 CRITICAL: Social media is inherently negative-biased. Only flag serious, widespread issues.
@@ -1688,8 +2118,90 @@ Return JSON format:
   "bias_warning": "Social media weighted minimally due to inherent negativity bias"
 }"""
         
-        social_data = {"twitter_data": twitter_data, "reddit_reviews": reddit_reviews}
+        social_data = {"reddit_reviews": reddit_reviews, "reddit_count": len(reddit_reviews)}
         return self._call_component_analyzer(prompt, social_data)
+    
+    def analyze_customer_support(self, google_reviews: List[Dict], reddit_reviews: List[Dict]) -> Dict[str, Any]:
+        """Analyze customer support component (10% weight)"""
+        prompt = f"""Analyze customer support quality from available review data and provide a score from 0-10.
+review data = {google_reviews: {google_reviews}, reddit_reviews: {reddit_reviews}}
+Scoring Criteria:
+- 8.0-10.0: Few/no support complaints, evidence of good service
+- 6.0-7.9: Some complaints but not overwhelming
+- 4.0-5.9: Multiple support complaints
+- 0-3.9: Widespread support complaints
+
+Return JSON: {"customer_support_score": score calculated, "confidence_level": "Medium", "key_factors": ["factor1", "factor2"]}"""
+        
+        data = {
+            "google_reviews_count": len(google_reviews),
+            "reddit_posts_count": len(reddit_reviews),
+            "total_data_points": len(google_reviews) + len(reddit_reviews)
+        }
+        
+        return self._call_component_analyzer(prompt, data)
+
+
+
+
+    
+#     def analyze_review_sentiment(self, google_reviews: List[Dict], reddit_reviews: List[Dict]) -> Dict[str, Any]:
+#         """Analyze review sentiment component (15% weight - increased from 10%)"""
+#         prompt = """You are a Review Sentiment Specialist. Analyze review themes and sentiment patterns.
+
+# Scoring Criteria:
+# - 8.5-10.0: Outstanding - consistently glowing reviews, net positive ratio >3:1
+# - 7.0-8.4: Good - generally positive feedback, ratio 2-3:1
+# - 6.0-6.9: Decent - mixed but mostly positive, ratio 1.3-2:1
+# - 4.5-5.9: Below Average - more complaints than praise, ratio 0.7-1.3:1
+# - 0-4.4: Poor - predominantly negative, ratio <0.7:1
+
+# Return JSON format:
+# {
+#   "review_sentiment_score": 6.8,
+#   "confidence_level": "High",
+#   "positive_negative_ratio": 2.1,
+#   "key_factors": [
+#     "Positive themes dominate with style and comfort praise",
+#     "Some durability concerns but manageable",
+#     "Overall satisfied customer base"
+#   ],
+#   "scoring_rationale": "Good score due to 2.1:1 positive/negative ratio"
+# }"""
+        
+#         # Combine review data
+#         all_reviews = google_reviews + reddit_reviews
+#         sentiment_data = self._prepare_sentiment_data(all_reviews)
+#         return self._call_component_analyzer(prompt, sentiment_data)
+    
+#     # def analyze_social_media(self, twitter_data: Dict, reddit_reviews: List[Dict]) -> Dict[str, Any]:
+#     def analyze_social_media(self, reddit_reviews: List[Dict]) -> Dict[str, Any]:
+#         """Analyze social media component (10% weight)"""
+#         prompt = """You are a Social Media Pattern Specialist. Identify significant patterns in social media mentions.
+
+# CRITICAL: Social media is inherently negative-biased. Only flag serious, widespread issues.
+
+# Scoring Criteria:
+# - 8.0-10.0: Rare positive mentions or neutral/minimal presence
+# - 6.0-7.9: Normal negative bias, no extreme patterns
+# - 4.0-5.9: Concerning patterns but not extreme
+# - 2.0-3.9: Widespread negative patterns
+# - 0-1.9: Extreme negative patterns, "avoid this brand" sentiment
+
+# Return JSON format:
+# {
+#   "social_media_score": 6.5,
+#   "confidence_level": "Medium",
+#   "key_factors": [
+#     "Moderate social media presence with typical negative bias",
+#     "Some complaints but no extreme widespread issues"
+#   ],
+#   "bias_warning": "Social media weighted minimally due to inherent negativity bias"
+# }"""
+        
+#         # social_data = {"twitter_data": twitter_data, "reddit_reviews": reddit_reviews}
+#         social_data = {"reddit_reviews": reddit_reviews}
+#         return self._call_component_analyzer(prompt, social_data)
     
     def analyze_customer_support(self, google_reviews: List[Dict], reddit_reviews: List[Dict]) -> Dict[str, Any]:
         """Analyze customer support component (10% weight)"""
@@ -1746,7 +2258,7 @@ Return JSON format:
         
         print("  Analyzing social media...")
         component_scores['social_media'] = self.analyze_social_media(
-            state.get("twitter_data", {}),
+            # state.get("twitter_data", {}),
             state.get("reddit_reviews", [])
         )
         
@@ -1855,39 +2367,85 @@ class ReportGenerator:
         pass
     
     def generate_comprehensive_report(self, state: BrandAnalysisState) -> Dict[str, Any]:
-        """Generate a comprehensive analysis report"""
-        
-        trust_score = state.get("trust_score", {})
-        final_score = trust_score.get("final_score", 0.0)
-        
-        # Create summary
-        summary = {
-            "brand_name": state["brand_name"],
-            "overall_score": final_score,
-            "recommendation": trust_score.get("score_interpretation", "Unable to determine"),
-            "data_sources_analyzed": {
-                "google_reviews": len(state.get("google_reviews", [])),
-                "reddit_reviews": len(state.get("reddit_reviews", [])),
-                "twitter_mentions": bool(state.get("twitter_data", {})),
-                "website_analysis": bool(state.get("website_trust_data", {}))
-            },
-            "key_strengths": [],
-            "areas_of_concern": [],
-            "data_collection_status": state.get("collection_status", {})
-        }
-        
-        # Add component insights
-        component_breakdown = trust_score.get("component_breakdown", {})
-        
-        # Identify strengths and concerns
-        for component, details in component_breakdown.items():
-            score = details.get("score", 0)
-            if score >= 7.5:
-                summary["key_strengths"].append(f"{component.replace('_', ' ').title()}: {score}/10")
-            elif score < 5.5:
-                summary["areas_of_concern"].append(f"{component.replace('_', ' ').title()}: {score}/10")
-        
-        return summary
+            """Generate a comprehensive analysis report with all component scores"""
+            
+            trust_score = state.get("trust_score", {})
+            final_score = trust_score.get("final_score", 0.0)
+            component_breakdown = trust_score.get("component_breakdown", {})
+            component_results = trust_score.get("component_results", {})
+            
+            # Create detailed summary with all scores
+            summary = {
+                "brand_name": state["brand_name"],
+                "overall_score": final_score,
+                "recommendation": trust_score.get("score_interpretation", "Unable to determine"),
+                "data_sources_analyzed": {
+                    "google_reviews": len(state.get("google_reviews", [])),
+                    "reddit_reviews": len(state.get("reddit_reviews", [])),
+                    # "twitter_mentions": bool(state.get("twitter_data", {})),
+                    "website_analysis": bool(state.get("website_trust_data", {}))
+                },
+                # ADD: Component scores breakdown (this is what was missing!)
+                "component_scores": {
+                    component_name.replace('_', ' ').title(): {
+                        "score": details.get("score", 0),
+                        "weight": details.get("weight", "0%"),
+                        "contribution": details.get("contribution", 0)
+                    }
+                    for component_name, details in component_breakdown.items()
+                },
+                # ADD: Detailed component analysis results
+                "detailed_component_analysis": {
+                    "ratings": {
+                        "score": component_results.get("ratings", {}).get("ratings_score", 0),
+                        "confidence": component_results.get("ratings", {}).get("confidence_level", "Unknown"),
+                        "key_factors": component_results.get("ratings", {}).get("key_factors", []),
+                        "weight": "55%"
+                    },
+                    "business_legitimacy": {
+                        "score": component_results.get("business_legitimacy", {}).get("business_legitimacy_score", 0),
+                        "confidence": component_results.get("business_legitimacy", {}).get("confidence_level", "Unknown"),
+                        "key_factors": component_results.get("business_legitimacy", {}).get("key_factors", []),
+                        "weight": "10%"
+                    },
+                    "review_sentiment": {
+                        "score": component_results.get("review_sentiment", {}).get("review_sentiment_score", 0),
+                        "confidence": component_results.get("review_sentiment", {}).get("confidence_level", "Unknown"),
+                        "key_factors": component_results.get("review_sentiment", {}).get("key_factors", []),
+                        "weight": "20%"
+                    },
+                    "social_media": {
+                        "score": component_results.get("social_media", {}).get("social_media_score", 0),
+                        "confidence": component_results.get("social_media", {}).get("confidence_level", "Unknown"),
+                        "key_factors": component_results.get("social_media", {}).get("key_factors", []),
+                        "weight": "10%"
+                    },
+                    "customer_support": {
+                        "score": component_results.get("customer_support", {}).get("customer_support_score", 0),
+                        "confidence": component_results.get("customer_support", {}).get("confidence_level", "Unknown"),
+                        "key_factors": component_results.get("customer_support", {}).get("key_factors", []),
+                        "weight": "5%"
+                    }
+                },
+                "key_strengths": [],
+                "areas_of_concern": [],
+                "data_collection_status": state.get("collection_status", {}),
+                # ADD: Complete trust score data for debugging
+                "trust_score_details": trust_score
+            }
+            
+            # Identify strengths and concerns based on component scores
+            for component, details in component_breakdown.items():
+                score = details.get("score", 0)
+                weight = details.get("weight", "0%")
+                component_display = component.replace('_', ' ').title()
+                
+                if score >= 7.5:
+                    summary["key_strengths"].append(f"{component_display}: {score}/10 ({weight})")
+                elif score < 5.5:
+                    summary["areas_of_concern"].append(f"{component_display}: {score}/10 ({weight})")
+            
+            return summary
 
 
 def main():
